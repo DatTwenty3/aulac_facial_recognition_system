@@ -31,18 +31,21 @@ def save_face_data(face_data):
 class FaceRecognitionApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Face Recognition GUI")
+        self.setWindowTitle("AU LAC FACE RECONGNITION SYSTEM")
         self.face_data = load_face_data()  # {'name': np.array(128)}
         self.recognizing = False
-        # Thiết lập camera
+
+        # Thiết lập camera với độ phân giải lớn hơn
         self.cap = cv2.VideoCapture(0)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
         # Giao diện
         self.video_label = QLabel()
-        self.video_label.setFixedSize(640, 480)
+        # Khung video to hơn
+        self.video_label.setFixedSize(1280, 720)
         self.video_label.setAlignment(Qt.AlignCenter)
+
         self.btn_add = QPushButton("Thêm khuôn mặt")
         self.btn_delete = QPushButton("Xóa khuôn mặt")
         self.btn_recognize = QPushButton("Nhận dạng khuôn mặt")
@@ -54,9 +57,10 @@ class FaceRecognitionApp(QMainWindow):
         self.btn_list.clicked.connect(self.list_faces)
         self.btn_exit.clicked.connect(self.close)
 
+        # Bố cục nút bên phải
         right_layout = QVBoxLayout()
         for btn in [self.btn_add, self.btn_delete, self.btn_recognize, self.btn_list, self.btn_exit]:
-            btn.setFixedHeight(40)
+            btn.setFixedHeight(50)
             right_layout.addWidget(btn)
         right_layout.addStretch()
 
@@ -68,6 +72,7 @@ class FaceRecognitionApp(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
+        # Timer cập nhật khung hình
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
         self.timer.start(30)
@@ -77,22 +82,21 @@ class FaceRecognitionApp(QMainWindow):
         if not ret:
             return
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
         if self.recognizing and self.face_data:
-            # Nhận dạng với ngưỡng face_distance
             locs = face_recognition.face_locations(rgb_frame)
             encodings = face_recognition.face_encodings(rgb_frame, locs)
             for (top, right, bottom, left), encoding in zip(locs, encodings):
                 name = "Unknown"
-                # Tìm khoảng cách nhỏ nhất
                 distances = {person: face_recognition.face_distance([enc], encoding)[0]
                              for person, enc in self.face_data.items()}
                 if distances:
                     best_match = min(distances, key=distances.get)
-                    if distances[best_match] < 0.3:  # Ngưỡng có thể điều chỉnh
+                    if distances[best_match] < 0.5:
                         name = best_match
                 cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
                 cv2.putText(frame, name, (left, top - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
 
         h, w, ch = frame.shape
         bytes_line = ch * w
@@ -122,11 +126,10 @@ class FaceRecognitionApp(QMainWindow):
                 for (t, r, b, l) in locs:
                     cv2.rectangle(frame, (l, t), (r, b), (0, 255, 0), 2)
                     cv2.putText(frame, f"{count}/20", (l, t - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
                 cv2.imshow('Capturing', frame)
                 cv2.waitKey(100)
         cv2.destroyWindow('Capturing')
-        # Tính encoding trung bình
         mean_encoding = np.mean(samples, axis=0)
         self.face_data[name] = mean_encoding
         save_face_data(self.face_data)
