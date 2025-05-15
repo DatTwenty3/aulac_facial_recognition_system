@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QInputDialog, QMessageBox
 )
 from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtGui import QImage, QPixmap, QIcon
 
 # Đường dẫn đến file lưu trữ dữ liệu khuôn mặt
 DATA_FILE = 'face_data.pkl'
@@ -31,7 +31,8 @@ def save_face_data(face_data):
 class FaceRecognitionApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("AU LAC FACE RECONGNITION SYSTEM")
+        self.setWindowTitle("Au Lac Face Recognition System")
+        self.setWindowIcon(QIcon("AULAC.png"))  # Đặt icon của cửa sổ
         self.face_data = load_face_data()  # {'name': np.array(128)}
         self.recognizing = False
 
@@ -57,12 +58,31 @@ class FaceRecognitionApp(QMainWindow):
         self.btn_list.clicked.connect(self.list_faces)
         self.btn_exit.clicked.connect(self.close)
 
+        # Dòng chữ dưới logo
+        self.system_label = QLabel("Au Lac Face Recognition System")
+        self.system_label.setAlignment(Qt.AlignCenter)
+        self.system_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+
+        # Logo
+        self.logo_label = QLabel()
+        self.logo_label.setAlignment(Qt.AlignCenter)
+        if os.path.exists("AULAC.png"):
+            self.logo_label.setPixmap(QPixmap("AULAC.png").scaledToWidth(150, Qt.SmoothTransformation))
+
+        # Dòng chữ dưới logo
+        self.company_label = QLabel("AU LAC CONSTRUCTION")
+        self.company_label.setAlignment(Qt.AlignCenter)
+        self.company_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+
         # Bố cục nút bên phải
         right_layout = QVBoxLayout()
         for btn in [self.btn_add, self.btn_delete, self.btn_recognize, self.btn_list, self.btn_exit]:
             btn.setFixedHeight(50)
             right_layout.addWidget(btn)
         right_layout.addStretch()
+        right_layout.addWidget(self.system_label)
+        right_layout.addWidget(self.logo_label)
+        right_layout.addWidget(self.company_label)
 
         main_layout = QHBoxLayout()
         main_layout.addWidget(self.video_label)
