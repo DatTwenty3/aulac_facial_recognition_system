@@ -10,6 +10,7 @@ import face_recognition
 from face_data import load_face_data, add_encoding, delete_encoding
 from camera import Camera
 from recognizer import find_faces, match_faces
+from voice_greeter import VoiceGreeter
 
 class FaceRecognitionApp(QMainWindow):
     def __init__(self):
@@ -19,6 +20,8 @@ class FaceRecognitionApp(QMainWindow):
 
         self.face_data = load_face_data()
         self.recognizing = False
+        self.voice_greeter = VoiceGreeter()
+        self.last_greeted = set()  # Lưu những người đã được chào trong frame hiện tại
 
         self.camera = Camera()
         self._init_ui()
@@ -86,10 +89,24 @@ class FaceRecognitionApp(QMainWindow):
         if self.recognizing and self.face_data:
             locs, encs = find_faces(rgb)
             matches = match_faces(encs, self.face_data)
+            
+            # Reset danh sách người đã chào cho frame mới
+            current_faces = set()
+            
             for ((top, right, bottom, left), (name, color)) in zip(locs, matches):
                 cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
                 cv2.putText(frame, name, (left, top - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
+                
+                # Thêm vào danh sách người hiện tại
+                current_faces.add(name)
+                
+                # Nếu là người mới xuất hiện và không phải Unknown
+                if name not in self.last_greeted and name != "Unknown":
+                    self.voice_greeter.greet(name)
+            
+            # Cập nhật danh sách người đã chào
+            self.last_greeted = current_faces
 
         h, w, ch = frame.shape
         qt_img = QImage(frame.data, w, h, ch * w, QImage.Format_BGR888)
