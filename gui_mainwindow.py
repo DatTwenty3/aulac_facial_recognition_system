@@ -6,6 +6,7 @@ from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QImage, QPixmap, QIcon
 import cv2
 import face_recognition
+import unicodedata
 
 from face_data import load_face_data, add_encoding, delete_encoding
 from camera import Camera
@@ -80,6 +81,12 @@ class FaceRecognitionApp(QMainWindow):
         self.timer.timeout.connect(self.update_frame)
         self.timer.start(30)
 
+    def normalize_name_for_display(self, name: str) -> str:
+        # NFKD tách ký tự gốc và dấu, sau đó loại bỏ dấu và chuyển in hoa
+        nfkd = unicodedata.normalize('NFKD', name)
+        no_diacritics = ''.join(c for c in nfkd if not unicodedata.combining(c))
+        return no_diacritics.upper()
+
     def update_frame(self):
         ret, frame = self.camera.read_frame()
         if not ret:
@@ -89,23 +96,29 @@ class FaceRecognitionApp(QMainWindow):
         if self.recognizing and self.face_data:
             locs, encs = find_faces(rgb)
             matches = match_faces(encs, self.face_data)
-            
-            # Reset danh sách người đã chào cho frame mới
+
             current_faces = set()
-            
             for ((top, right, bottom, left), (name, color)) in zip(locs, matches):
+                display_name = self.normalize_name_for_display(name)
+
+                # Vẽ hộp và tên hiển thị
                 cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
-                cv2.putText(frame, name, (left, top - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
-                
-                # Thêm vào danh sách người hiện tại
-                current_faces.add(name)
-                
-                # Nếu là người mới xuất hiện và không phải Unknown
+                cv2.putText(
+                    frame,
+                    display_name,
+                    (left, top - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1.2,
+                    color,
+                    3
+                )
+
+                # Voice greeting vẫn dùng tên gốc có dấu
                 if name not in self.last_greeted and name != "Unknown":
                     self.voice_greeter.greet(name)
-            
-            # Cập nhật danh sách người đã chào
+
+                current_faces.add(name)
+
             self.last_greeted = current_faces
 
         h, w, ch = frame.shape
@@ -173,3 +186,12 @@ class FaceRecognitionApp(QMainWindow):
     def closeEvent(self, event):
         self.camera.release()
         super().closeEvent(event)
+
+if __name__ == '__main__':
+    import sys
+    from PyQt5.QtWidgets import QApplication
+
+    app = QApplication(sys.argv)
+    window = FaceRecognitionApp()
+    window.show()
+    sys.exit(app.exec_())
