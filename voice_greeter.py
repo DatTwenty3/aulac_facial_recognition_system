@@ -1,45 +1,76 @@
-import pyttsx3
-import threading
-from queue import Queue
-import time
-from greeting_log import GreetingLog
+import os
+from gtts import gTTS
+import pygame
+from datetime import datetime, date
+import json
 
 class VoiceGreeter:
     def __init__(self):
-        self.engine = pyttsx3.init()
-        self.engine.setProperty('rate', 150)  # Tốc độ nói
-        self.engine.setProperty('volume', 1.0)  # Âm lượng
+        self.greetings_dir = "greetings"
+        self.greeted_today = {}
+        self.current_date = date.today()
+        self._init_pygame()
+        self._load_greeted_today()
         
-        # Lấy danh sách giọng nói có sẵn
-        voices = self.engine.getProperty('voices')
-        # Tìm giọng tiếng Việt nếu có
-        vietnamese_voice = None
-        for voice in voices:
-            if 'vietnamese' in voice.name.lower():
-                vietnamese_voice = voice
-                break
-        if vietnamese_voice:
-            self.engine.setProperty('voice', vietnamese_voice.id)
+    def _init_pygame(self):
+        pygame.mixer.init()
         
-        self.queue = Queue()
-        self.is_speaking = False
-        self.speaking_thread = threading.Thread(target=self._speaking_worker, daemon=True)
-        self.speaking_thread.start()
-        
-        # Thêm GreetingLog để theo dõi người đã được chào trong ngày
-        self.greeting_log = GreetingLog()
+    def _load_greeted_today(self):
+        """Load danh sách người đã được chào trong ngày"""
+        greeted_file = os.path.join(self.greetings_dir, "greeted_today.json")
+        if os.path.exists(greeted_file):
+            with open(greeted_file, 'r') as f:
+                data = json.load(f)
+                last_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+                if last_date == self.current_date:
+                    self.greeted_today = data['greetings']
+                else:
+                    self.greeted_today = {}
     
-    def _speaking_worker(self):
-        while True:
-            if not self.queue.empty() and not self.is_speaking:
-                self.is_speaking = True
-                name = self.queue.get()
-                self.engine.say(f"Hello {name}, Wellcome to Au Lac Construction, Good you have a nice day!")
-                self.engine.runAndWait()
-                self.is_speaking = False
-            time.sleep(0.1)
+    def _save_greeted_today(self):
+        """Lưu danh sách người đã được chào trong ngày"""
+        os.makedirs(self.greetings_dir, exist_ok=True)
+        greeted_file = os.path.join(self.greetings_dir, "greeted_today.json")
+        with open(greeted_file, 'w') as f:
+            json.dump({
+                'date': self.current_date.strftime('%Y-%m-%d'),
+                'greetings': self.greeted_today
+            }, f, indent=2)
+    
+    def create_greeting(self, name):
+        """Tạo file âm thanh chào mừng cho người mới"""
+        os.makedirs(self.greetings_dir, exist_ok=True)
+        greeting_file = os.path.join(self.greetings_dir, f"{name}.mp3")
+        
+        if not os.path.exists(greeting_file):
+            tts = gTTS(text=f"Xin chào {name}, chào mừng bạn đến với công ty tư vấn và thiết kế Âu Lạc, chúc bạn có 1 ngày tốt lành!", lang='vi')
+            tts.save(greeting_file)
     
     def greet(self, name):
-        if name != "Unknown" and not self.greeting_log.is_greeted_today(name):
-            self.queue.put(name)
-            self.greeting_log.mark_as_greeted(name) 
+        """Phát âm thanh chào mừng nếu chưa chào trong ngày"""
+        # Kiểm tra và reset danh sách nếu sang ngày mới
+        if date.today() != self.current_date:
+            self.current_date = date.today()
+            self.greeted_today = {}
+            self._save_greeted_today()
+        
+        # Nếu chưa chào trong ngày
+        if name not in self.greeted_today:
+            greeting_file = os.path.join(self.greetings_dir, f"{name}.mp3")
+            
+            # Tạo file âm thanh nếu chưa có
+            if not os.path.exists(greeting_file):
+                self.create_greeting(name)
+            
+            # Phát âm thanh
+            pygame.mixer.music.load(greeting_file)
+            pygame.mixer.music.play()
+            
+            # Đợi cho đến khi phát xong
+            while pygame.mixer.music.get_busy():
+                pygame.time.Clock().tick(10)
+            
+            # Thêm vào danh sách đã chào với thời gian hiện tại
+            current_time = datetime.now().strftime('%H:%M:%S')
+            self.greeted_today[name] = current_time
+            self._save_greeted_today() 
